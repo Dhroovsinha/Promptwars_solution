@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.env.example
+tests/
+docs/
+README.md
+Dockerfile
+nginx.conf
+.dockerignore
