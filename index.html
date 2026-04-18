@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="VenueFlow — AI-powered venue navigation assistant for large-scale sporting events. Real-time queue tracking, crowd routing, and smart coordination." />
+  <meta name="theme-color" content="#0b0f1a" />
+  <title>VenueFlow — Smart Venue Assistant</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Accessibility: Skip navigation -->
+  <a href="#chat-input" class="skip-link">Skip to assistant</a>
+
+  <div id="app">
+    <!-- ====== Header ====== -->
+    <header class="header" role="banner">
+      <div class="header__brand">
+        <div class="header__logo" aria-hidden="true">V</div>
+        <span class="header__title">VenueFlow</span>
+      </div>
+      <div class="header__venue" aria-live="polite">
+        <span class="header__live-dot" aria-hidden="true"></span>
+        <span id="venue-name">National Stadium — Live</span>
+      </div>
+      <button class="settings-btn" id="settings-btn" aria-label="Settings" title="API Settings">⚙</button>
+    </header>
+
+    <!-- ====== Main Content ====== -->
+    <main class="main" role="main">
+
+      <!-- --- Map Panel --- -->
+      <section class="map-panel" aria-label="Venue Map">
+        <div id="venue-map" role="img" aria-label="Interactive venue map"></div>
+
+        <!-- Queue status overlay -->
+        <div class="queue-overlay" id="queue-overlay" aria-label="Live queue status">
+          <div class="queue-overlay__title">⏱ Live Queue Status</div>
+          <div id="queue-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Chat Panel --- -->
+      <aside class="chat-panel" aria-label="AI Assistant Chat">
+
+        <div class="chat-panel__header">
+          <div class="chat-panel__avatar" aria-hidden="true">🤖</div>
+          <div class="chat-panel__info">
+            <h2>VenueFlow Assistant</h2>
+            <p>Powered by Google Gemini</p>
+          </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="status-indicator" id="status-indicator">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+
+        <!-- Messages area -->
+        <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Typing indicator -->
+        <div class="typing-indicator" id="typing-indicator" aria-label="Assistant is typing">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+
+        <!-- Quick action buttons -->
+        <div class="quick-actions" role="toolbar" aria-label="Quick questions">
+          <button class="quick-action-btn" data-query="Where is the shortest food queue?">🍔 Shortest food queue</button>
+          <button class="quick-action-btn" data-query="Find the nearest restroom with no wait">🚻 Nearest restroom</button>
+          <button class="quick-action-btn" data-query="How do I get to my seat in Section B?">💺 Find my seat</button>
+          <button class="quick-action-btn" data-query="When is halftime? Best time to grab food?">⏰ Halftime plan</button>
+          <button class="quick-action-btn" data-query="What are the exit routes to avoid crowds?">🚪 Exit strategy</button>
+        </div>
+
+        <!-- Chat input -->
+        <div class="chat-input-area">
+          <label for="chat-input" class="sr-only">Ask VenueFlow Assistant</label>
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="Ask about queues, directions, or the event..."
+            autocomplete="off"
+            aria-label="Type your question"
+          />
+          <button id="send-btn" aria-label="Send message" disabled>➤</button>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ====== Alerts Bar ====== -->
+    <div class="alerts-bar hidden" id="alerts-bar" role="alert" aria-live="assertive">
+      <span>⚠</span>
+      <span id="alert-text"></span>
+    </div>
+  </div>
+
+  <!-- ====== Config Modal ====== -->
+  <div class="config-modal-backdrop hidden" id="config-modal" role="dialog" aria-label="API Configuration" aria-modal="true">
+    <div class="config-modal">
+      <h2>⚡ Setup API Keys</h2>
+      <p>Enter your Google API keys to enable live features. Keys are stored locally in your browser and never sent to third parties.</p>
+
+      <div class="config-field">
+        <label for="config-gemini-key">Gemini API Key</label>
+        <input type="password" id="config-gemini-key" placeholder="AIza..." />
+      </div>
+      <div class="config-field">
+        <label for="config-maps-key">Google Maps API Key (optional)</label>
+        <input type="password" id="config-maps-key" placeholder="AIza..." />
+      </div>
+
+      <div class="config-actions">
+        <button class="btn-primary" id="config-save-btn">Save & Connect</button>
+        <button class="btn-secondary" id="config-demo-btn">Use Demo Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Scripts ====== -->
+  <script src="js/utils.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/assistant.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

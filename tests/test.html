@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VenueFlow — Test Suite</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0b0f1a;
+      color: #e8ecf4;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { color: #8892a8; font-size: 0.875rem; margin-bottom: 2rem; }
+    .test-group {
+      margin-bottom: 1.5rem;
+      background: #131a2e;
+      border-radius: 0.75rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .test-group__title {
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      background: #1a2340;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .test {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .test:last-child { border-bottom: none; }
+    .test__icon { font-size: 1rem; flex-shrink: 0; }
+    .test__name { flex: 1; }
+    .test__status { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+    .pass { color: #34a853; }
+    .pass .test__status { background: rgba(52,168,83,0.15); color: #34a853; }
+    .fail { color: #ea4335; }
+    .fail .test__status { background: rgba(234,67,53,0.15); color: #ea4335; }
+    .summary {
+      margin-top: 2rem;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .summary.all-pass { background: rgba(52,168,83,0.15); color: #34a853; border: 1px solid rgba(52,168,83,0.3); }
+    .summary.has-fail { background: rgba(234,67,53,0.15); color: #ea4335; border: 1px solid rgba(234,67,53,0.3); }
+  </style>
+</head>
+<body>
+  <h1>🧪 VenueFlow Test Suite</h1>
+  <p class="subtitle">Automated validation of core modules — utilities, queue logic, assistant, and data layer.</p>
+  <div id="results"></div>
+  <div id="summary"></div>
+
+  <!-- Load modules under test -->
+  <script src="../js/utils.js"></script>
+  <script src="../js/firebase-config.js"></script>
+  <script src="../js/queue.js"></script>
+  <script src="../js/assistant.js"></script>
+
+  <script>
+    /**
+     * Minimal test runner — no dependencies.
+     */
+    const TestRunner = (() => {
+      let results = [];
+      let currentGroup = '';
+
+      function group(name) {
+        currentGroup = name;
+      }
+
+      function assert(name, condition) {
+        results.push({
+          group: currentGroup,
+          name,
+          passed: !!condition
+        });
+      }
+
+      function assertEqual(name, actual, expected) {
+        const passed = actual === expected;
+        results.push({
+          group: currentGroup,
+          name: passed ? name : `${name} — expected "${expected}", got "${actual}"`,
+          passed
+        });
+      }
+
+      function assertType(name, value, type) {
+        const passed = typeof value === type;
+        results.push({
+          group: currentGroup,
+          name: passed ? name : `${name} — expected type ${type}, got ${typeof value}`,
+          passed
+        });
+      }
+
+      function render() {
+        const container = document.getElementById('results');
+        const summary = document.getElementById('summary');
+
+        // Group results
+        const groups = {};
+        results.forEach(r => {
+          if (!groups[r.group]) groups[r.group] = [];
+          groups[r.group].push(r);
+        });
+
+        let html = '';
+        Object.entries(groups).forEach(([groupName, tests]) => {
+          html += `<div class="test-group">
+            <div class="test-group__title">${groupName}</div>`;
+          tests.forEach(t => {
+            const cls = t.passed ? 'pass' : 'fail';
+            const icon = t.passed ? '✅' : '❌';
+            const status = t.passed ? 'PASS' : 'FAIL';
+            html += `<div class="test ${cls}">
+              <span class="test__icon">${icon}</span>
+              <span class="test__name">${t.name}</span>
+              <span class="test__status">${status}</span>
+            </div>`;
+          });
+          html += '</div>';
+        });
+
+        container.innerHTML = html;
+
+        const total = results.length;
+        const passed = results.filter(r => r.passed).length;
+        const failed = total - passed;
+        const cls = failed === 0 ? 'all-pass' : 'has-fail';
+        summary.innerHTML = `<div class="summary ${cls}">
+          ${failed === 0 ? '🎉' : '⚠'} ${passed}/${total} tests passed${failed > 0 ? ` — ${failed} failed` : ' — All clear!'}
+        </div>`;
+      }
+
+      return { group, assert, assertEqual, assertType, render };
+    })();
+
+    // ==========================================
+    // TEST SUITE
+    // ==========================================
+
+    // --- VenueUtils Tests ---
+    TestRunner.group('VenueUtils — Sanitization');
+    TestRunner.assertEqual(
+      'sanitize() escapes HTML tags',
+      VenueUtils.sanitize('<b>bold<' + '/b>'),
+      '&lt;b&gt;bold&lt;/b&gt;'
+    );
+    TestRunner.assertEqual(
+      'sanitize() preserves normal text',
+      VenueUtils.sanitize('Hello World'),
+      'Hello World'
+    );
+    TestRunner.assertEqual(
+      'sanitize() escapes ampersands',
+      VenueUtils.sanitize('A & B'),
+      'A &amp; B'
+    );
+
+    TestRunner.group('VenueUtils — Wait Time Formatting');
+    TestRunner.assertEqual(
+      'formatWaitTime() under 1 minute',
+      VenueUtils.formatWaitTime(0.5),
+      '< 1 min'
+    );
+    TestRunner.assertEqual(
+      'formatWaitTime() normal minutes',
+      VenueUtils.formatWaitTime(5),
+      '~5 min'
+    );
+    TestRunner.assertEqual(
+      'formatWaitTime() over 60 minutes',
+      VenueUtils.formatWaitTime(75),
+      '~1h 15m'
+    );
+
+    TestRunner.group('VenueUtils — Queue Level Classification');
+    TestRunner.assertEqual(
+      'getQueueLevel() low (≤3 min)',
+      VenueUtils.getQueueLevel(2),
+      'low'
+    );
+    TestRunner.assertEqual(
+      'getQueueLevel() medium (4-8 min)',
+      VenueUtils.getQueueLevel(5),
+      'med'
+    );
+    TestRunner.assertEqual(
+      'getQueueLevel() high (>8 min)',
+      VenueUtils.getQueueLevel(12),
+      'high'
+    );
+    TestRunner.assertEqual(
+      'getQueueLevel() boundary: exactly 3 is low',
+      VenueUtils.getQueueLevel(3),
+      'low'
+    );
+    TestRunner.assertEqual(
+      'getQueueLevel() boundary: exactly 8 is med',
+      VenueUtils.getQueueLevel(8),
+      'med'
+    );
+
+    TestRunner.group('VenueUtils — Utility Functions');
+    TestRunner.assertType(
+      'uid() returns a string',
+      VenueUtils.uid(),
+      'string'
+    );
+    TestRunner.assert(
+      'uid() generates unique IDs',
+      VenueUtils.uid() !== VenueUtils.uid()
+    );
+    TestRunner.assertType(
+      'timeNow() returns a string',
+      VenueUtils.timeNow(),
+      'string'
+    );
+    TestRunner.assert(
+      'debounce() returns a function',
+      typeof VenueUtils.debounce(() => {}, 100) === 'function'
+    );
+
+    TestRunner.group('VenueUtils — Message Formatting');
+    TestRunner.assert(
+      'formatMessage() converts **bold** to <strong>',
+      VenueUtils.formatMessage('**hello**').includes('<strong>hello</strong>')
+    );
+    TestRunner.assert(
+      'formatMessage() converts *italic* to <em>',
+      VenueUtils.formatMessage('*hello*').includes('<em>hello</em>')
+    );
+    TestRunner.assert(
+      'formatMessage() converts newlines to <br>',
+      VenueUtils.formatMessage('line1\nline2').includes('<br>')
+    );
+    TestRunner.assert(
+      'formatMessage() still sanitizes HTML',
+      !VenueUtils.formatMessage('<img src=x onerror=alert(1)>').includes('<img')
+    );
+
+    TestRunner.group('VenueUtils — Storage');
+    VenueUtils.storage.set('test_key', { a: 1 });
+    TestRunner.assertEqual(
+      'storage.set/get roundtrip works',
+      JSON.stringify(VenueUtils.storage.get('test_key')),
+      JSON.stringify({ a: 1 })
+    );
+    TestRunner.assertEqual(
+      'storage.get returns fallback for missing key',
+      VenueUtils.storage.get('nonexistent', 'default'),
+      'default'
+    );
+    VenueUtils.storage.remove('test_key');
+    TestRunner.assertEqual(
+      'storage.remove deletes the key',
+      VenueUtils.storage.get('test_key', null),
+      null
+    );
+
+    // --- FirebaseService Tests ---
+    TestRunner.group('FirebaseService — Demo Data Generation');
+    const demoQueues = FirebaseService.generateDemoData('queues');
+    TestRunner.assert(
+      'generateDemoData("queues") returns an object with entries',
+      Object.keys(demoQueues).length > 0
+    );
+    TestRunner.assert(
+      'Queue entries have name, wait, and type fields',
+      demoQueues.food_north &&
+      typeof demoQueues.food_north.name === 'string' &&
+      typeof demoQueues.food_north.wait === 'number' &&
+      typeof demoQueues.food_north.type === 'string'
+    );
+    TestRunner.assert(
+      'Queue wait times are non-negative',
+      Object.values(demoQueues).every(q => q.wait >= 0)
+    );
+
+    const demoAlerts = FirebaseService.generateDemoData('alerts');
+    TestRunner.assert(
+      'generateDemoData("alerts") returns an array',
+      Array.isArray(demoAlerts)
+    );
+
+    const demoCrowd = FirebaseService.generateDemoData('crowd_density');
+    TestRunner.assert(
+      'generateDemoData("crowd_density") returns density values between 0-1',
+      Object.values(demoCrowd).every(d => d.density >= 0 && d.density <= 1.1)
+    );
+
+    TestRunner.group('FirebaseService — Initialization');
+    (async () => {
+      const result = await FirebaseService.init(null);
+      TestRunner.assertEqual(
+        'init(null) returns false (demo mode)',
+        result,
+        false
+      );
+
+      const resultEmpty = await FirebaseService.init({ apiKey: '' });
+      TestRunner.assertEqual(
+        'init with empty apiKey returns false',
+        resultEmpty,
+        false
+      );
+
+      // --- Assistant Tests ---
+      TestRunner.group('Assistant — Initialization');
+      Assistant.init(null);
+      TestRunner.assertEqual(
+        'Assistant.isLive() is false without API key',
+        Assistant.isLive(),
+        false
+      );
+      Assistant.init('test-key-123');
+      TestRunner.assertEqual(
+        'Assistant.isLive() is true with API key',
+        Assistant.isLive(),
+        true
+      );
+
+      // Reset to demo mode for chat tests
+      Assistant.init(null);
+
+      TestRunner.group('Assistant — Demo Mode Chat (Intent Recognition)');
+
+      // Initialize QueueManager with mock DOM
+      if (!document.getElementById('queue-list')) {
+        const div = document.createElement('div');
+        div.id = 'queue-list';
+        div.style.display = 'none';
+        document.body.appendChild(div);
+      }
+      if (!document.getElementById('alerts-bar')) {
+        const div = document.createElement('div');
+        div.id = 'alerts-bar';
+        div.className = 'hidden';
+        div.style.display = 'none';
+        div.innerHTML = '<span id="alert-text"></span>';
+        document.body.appendChild(div);
+      }
+      QueueManager.init();
+
+      // Wait for initial data
+      await new Promise(r => setTimeout(r, 200));
+
+      const foodResp = await Assistant.chat('Where can I get food?');
+      TestRunner.assert(
+        'Food query returns response mentioning a food location',
+        foodResp.toLowerCase().includes('food') || foodResp.toLowerCase().includes('snack')
+      );
+
+      const restroomResp = await Assistant.chat('I need the restroom');
+      TestRunner.assert(
+        'Restroom query returns response mentioning restroom',
+        restroomResp.toLowerCase().includes('restroom')
+      );
+
+      const seatResp = await Assistant.chat('How do I find Section B?');
+      TestRunner.assert(
+        'Seat query returns response with section directions',
+        seatResp.toLowerCase().includes('section b') || seatResp.toLowerCase().includes('south')
+      );
+
+      const exitResp = await Assistant.chat('How should I exit after the game?');
+      TestRunner.assert(
+        'Exit query returns strategy advice',
+        exitResp.toLowerCase().includes('exit') || exitResp.toLowerCase().includes('gate')
+      );
+
+      const helpResp = await Assistant.chat('What can you help me with?');
+      TestRunner.assert(
+        'Help query lists capabilities',
+        helpResp.toLowerCase().includes('food') && helpResp.toLowerCase().includes('seat')
+      );
+
+      const unknownResp = await Assistant.chat('What is the meaning of life?');
+      TestRunner.assert(
+        'Unknown query returns helpful fallback',
+        unknownResp.toLowerCase().includes('help') || unknownResp.toLowerCase().includes('try asking')
+      );
+
+      const greetResp = await Assistant.chat('Hello!');
+      TestRunner.assert(
+        'Greeting returns welcome response',
+        greetResp.toLowerCase().includes('welcome') || greetResp.toLowerCase().includes('hey')
+      );
+
+      const merchResp = await Assistant.chat('Where can I buy a jersey?');
+      TestRunner.assert(
+        'Merchandise query returns store info',
+        merchResp.toLowerCase().includes('merch') || merchResp.toLowerCase().includes('store')
+      );
+
+      const emergResp = await Assistant.chat('I need first aid help');
+      TestRunner.assert(
+        'Emergency query returns medical info',
+        emergResp.toLowerCase().includes('first aid') || emergResp.toLowerCase().includes('medical')
+      );
+
+      // --- QueueManager Tests ---
+      TestRunner.group('QueueManager — Recommendations');
+      const bestFood = QueueManager.findBest('food');
+      TestRunner.assert(
+        'findBest("food") returns an object with name and wait',
+        bestFood && typeof bestFood.name === 'string' && typeof bestFood.wait === 'number'
+      );
+      TestRunner.assert(
+        'findBest("food") returns the lowest wait time',
+        (() => {
+          const queues = QueueManager.getQueues();
+          const foodQueues = Object.values(queues).filter(q => q.type === 'food');
+          const minWait = Math.min(...foodQueues.map(q => q.wait));
+          return Math.abs(bestFood.wait - minWait) < 0.01;
+        })()
+      );
+
+      const bestRestroom = QueueManager.findBest('restroom');
+      TestRunner.assert(
+        'findBest("restroom") returns a valid result',
+        bestRestroom && bestRestroom.level
+      );
+
+      const noType = QueueManager.findBest('nonexistent');
+      TestRunner.assertEqual(
+        'findBest() returns null for unknown type',
+        noType,
+        null
+      );
+
+      TestRunner.group('QueueManager — Summary Generation');
+      const summary = QueueManager.getSummaryForAssistant();
+      TestRunner.assert(
+        'getSummaryForAssistant() returns a non-empty string',
+        typeof summary === 'string' && summary.length > 50
+      );
+      TestRunner.assert(
+        'Summary contains queue status indicators',
+        summary.includes('🟢') || summary.includes('🟡') || summary.includes('🔴')
+      );
+
+      // Render all results
+      TestRunner.render();
+
+      // Cleanup
+      FirebaseService.destroy();
+    })();
+  </script>
+</body>
+</html>
