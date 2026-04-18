@@ -219,22 +219,24 @@ const App = (() => {
    */
   function getWelcomeMessage(isLive) {
     const best = QueueManager.findBest('food');
-    const time = VenueUtils.timeNow();
+    const phase = FirebaseService.getCurrentPhase();
 
     let msg = `👋 **Welcome to National Stadium!** I'm your VenueFlow Assistant.`;
+    msg += `\n📊 **Current phase: ${phase.phaseLabel}**`;
     msg += `\n\nI can help you with:\n`;
-    msg += `• 🍔 Finding the shortest food queue\n`;
+    msg += `• 🍔 Finding the best food option (scored & ranked)\n`;
     msg += `• 🚻 Locating nearby restrooms\n`;
     msg += `• 💺 Navigating to your seat\n`;
     msg += `• 🚪 Planning your exit strategy\n`;
-    msg += `• ⏰ Timing your halftime break`;
+    msg += `• 🔮 Predicting future queue times`;
 
     if (best) {
-      msg += `\n\n📊 **Quick update:** ${best.name} currently has the shortest food wait at **${best.formatted}**.`;
+      msg += `\n\n⭐ **Best food now:** ${best.name} (${best.waitFormatted}) — score: ${best.score}/100`;
+      if (best.reasoning) msg += `\n*${best.reasoning}*`;
     }
 
     if (!isLive) {
-      msg += `\n\n*Running in demo mode with smart local AI. Add your Gemini API key in ⚙ Settings for full AI responses.*`;
+      msg += `\n\n*Running in demo mode with AI decision intelligence. Add your Gemini API key in ⚙ Settings for full AI responses.*`;
     }
 
     return msg;

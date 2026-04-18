@@ -1,8 +1,8 @@
 /**
  * queue.js — Real-time queue monitoring and recommendation engine.
  *
- * Subscribes to Firebase data and provides smart recommendations
- * for shortest queues, best timing, and crowd avoidance.
+ * Subscribes to Firebase data, feeds snapshots into the DecisionEngine,
+ * and renders an upgraded overlay with badges, trends, and predictions.
  */
 
 const QueueManager = (() => {
@@ -10,6 +10,8 @@ const QueueManager = (() => {
 
   let currentQueues = {};
   let currentAlerts = [];
+  let currentCrowdDensity = {};
+  let currentPhase = { phase: 'unknown', phaseLabel: 'Loading...' };
   let updateCallbacks = [];
 
   /**
@@ -18,6 +20,7 @@ const QueueManager = (() => {
   function init() {
     FirebaseService.onData('queues', (data) => {
       currentQueues = data || {};
+      DecisionEngine.recordSnapshot(currentQueues);
       renderQueueOverlay();
       notifyUpdate();
     });
@@ -25,6 +28,17 @@ const QueueManager = (() => {
     FirebaseService.onData('alerts', (data) => {
       currentAlerts = data || [];
       renderAlerts();
+    });
+
+    // NEW: subscribe to crowd density for decision engine
+    FirebaseService.onData('crowd_density', (data) => {
+      currentCrowdDensity = data || {};
+    });
+
+    // NEW: subscribe to event phase for contextual UI
+    FirebaseService.onData('event_phase', (data) => {
+      if (data) currentPhase = data;
+      renderPhaseIndicator();
     });
   }
 
@@ -49,6 +63,22 @@ const QueueManager = (() => {
   }
 
   /**
+   * Get current crowd density data.
+   * @returns {Object}
+   */
+  function getCrowdDensity() {
+    return { ...currentCrowdDensity };
+  }
+
+  /**
+   * Get the current event phase.
+   * @returns {Object}
+   */
+  function getPhase() {
+    return { ...currentPhase };
+  }
+
+  /**
    * Get all active alerts.
    * @returns {Array} Active alert objects.
    */
@@ -57,39 +87,35 @@ const QueueManager = (() => {
   }
 
   /**
-   * Find the best option for a given type (food, restroom, etc.).
+   * Find the best option using the Decision Engine (multi-factor scoring).
    * @param {string} type - Queue type to filter by.
-   * @returns {Object|null} Best queue option with name and wait time.
+   * @returns {Object|null} Best option with score, reasoning, and badge.
    */
   function findBest(type) {
-    const filtered = Object.entries(currentQueues)
-      .filter(([_, q]) => q.type === type)
-      .sort((a, b) => a[1].wait - b[1].wait);
-
-    if (filtered.length === 0) return null;
-
-    const [id, queue] = filtered[0];
-    return {
-      id,
-      name: queue.name,
-      wait: queue.wait,
-      level: VenueUtils.getQueueLevel(queue.wait),
-      formatted: VenueUtils.formatWaitTime(queue.wait)
-    };
+    const best = DecisionEngine.recommend(type, currentQueues, currentCrowdDensity);
+    if (!best) return null;
+    return best;
   }
 
   /**
-   * Get a summary of all queues for the AI assistant context.
-   * @returns {string} Human-readable queue summary.
+   * Get ranked options for a type using the Decision Engine.
+   * @param {string} type - Facility type.
+   * @returns {Object[]} Ranked and scored options.
+   */
+  function getRanked(type) {
+    return DecisionEngine.rankOptions(type, currentQueues, currentCrowdDensity);
+  }
+
+  /**
+   * Get a comprehensive summary for the AI assistant, powered by the Decision Engine.
+   * @returns {string} Human-readable intelligence report.
    */
   function getSummaryForAssistant() {
-    const lines = Object.entries(currentQueues).map(([id, q]) => {
-      const level = VenueUtils.getQueueLevel(q.wait);
-      const emoji = level === 'low' ? '🟢' : level === 'med' ? '🟡' : '🔴';
-      return `${emoji} ${q.name}: ~${Math.round(q.wait)} min wait (${q.type})`;
-    });
+    let summary = DecisionEngine.generateSitReport(currentQueues, currentCrowdDensity);
 
-    let summary = '**Current Queue Status:**\n' + lines.join('\n');
+    // Add event phase context
+    const phase = FirebaseService.getCurrentPhase();
+    summary += `\n\n**Event Phase:** ${phase.phaseLabel}`;
 
     if (currentAlerts.length > 0) {
       summary += '\n\n**Active Alerts:**\n' +
@@ -100,26 +126,47 @@ const QueueManager = (() => {
   }
 
   /**
-   * Render queue items into the overlay panel.
+   * Render the upgraded queue overlay with badges, trends, and wait times.
    */
   function renderQueueOverlay() {
     const container = document.getElementById('queue-list');
     if (!container) return;
 
-    container.innerHTML = Object.entries(currentQueues)
-      .sort((a, b) => a[1].wait - b[1].wait)
-      .slice(0, 6) // Show top 6
-      .map(([id, q]) => {
-        const level = VenueUtils.getQueueLevel(q.wait);
-        const levelLabel = level === 'low' ? 'Short' : level === 'med' ? 'Medium' : 'Long';
-        return `
-          <div class="queue-item" data-queue-id="${id}">
-            <span class="queue-item__name">${VenueUtils.sanitize(q.name)}</span>
-            <span class="queue-item__badge queue-item__badge--${level}" title="${VenueUtils.formatWaitTime(q.wait)} wait">
-              ${levelLabel}
+    // Get ranked options across all types for display
+    const allRanked = [];
+    ['food', 'restroom', 'gate', 'merch'].forEach(type => {
+      const ranked = DecisionEngine.rankOptions(type, currentQueues, currentCrowdDensity);
+      allRanked.push(...ranked);
+    });
+
+    // Sort by score (best first) and show top 7
+    allRanked.sort((a, b) => b.score - a.score);
+
+    container.innerHTML = allRanked.slice(0, 7).map(opt => {
+      const trendIcon = opt.trend.direction === 'increasing' ? '📈' :
+                        opt.trend.direction === 'decreasing' ? '📉' : '';
+      const badgeHtml = opt.badge
+        ? `<span class="queue-item__tag">${opt.badge}</span>`
+        : '';
+      const predWarn = opt.prediction.warning
+        ? `<div class="queue-item__prediction">${opt.prediction.warning}</div>`
+        : '';
+
+      return `
+        <div class="queue-item ${opt.badge ? 'queue-item--highlighted' : ''}" data-queue-id="${opt.id}" title="Score: ${opt.score}/100 — ${opt.reasoning}">
+          <div class="queue-item__left">
+            <span class="queue-item__name">${VenueUtils.sanitize(opt.name)}</span>
+            ${badgeHtml}
+            ${predWarn}
+          </div>
+          <div class="queue-item__right">
+            <span class="queue-item__wait">${trendIcon} ${VenueUtils.formatWaitTime(opt.wait)}</span>
+            <span class="queue-item__badge queue-item__badge--${opt.level}">
+              ${opt.level === 'low' ? 'Short' : opt.level === 'med' ? 'Medium' : 'Long'}
             </span>
-          </div>`;
-      }).join('');
+          </div>
+        </div>`;
+    }).join('');
   }
 
   /**
@@ -138,5 +185,38 @@ const QueueManager = (() => {
     }
   }
 
-  return { init, onUpdate, getQueues, getAlerts, findBest, getSummaryForAssistant };
+  /**
+   * Render the event phase indicator in the queue overlay.
+   */
+  function renderPhaseIndicator() {
+    const overlay = document.getElementById('queue-overlay');
+    if (!overlay) return;
+
+    let phaseEl = document.getElementById('phase-indicator');
+    if (!phaseEl) {
+      phaseEl = document.createElement('div');
+      phaseEl.id = 'phase-indicator';
+      phaseEl.className = 'phase-indicator';
+      // Insert after the title
+      const title = overlay.querySelector('.queue-overlay__title');
+      if (title) title.after(phaseEl);
+    }
+
+    const phase = FirebaseService.getCurrentPhase();
+    const phaseColors = {
+      pre_event: '#fbbc04',
+      first_half: '#34a853',
+      halftime: '#ea4335',
+      second_half: '#34a853',
+      post_match: '#fbbc04',
+      cooldown: '#4285f4',
+    };
+    const color = phaseColors[phase.phase] || '#8892a8';
+    phaseEl.innerHTML = `<span class="phase-dot" style="background:${color}"></span> ${phase.phaseLabel}`;
+  }
+
+  return {
+    init, onUpdate, getQueues, getCrowdDensity, getPhase,
+    getAlerts, findBest, getRanked, getSummaryForAssistant
+  };
 })();

@@ -241,19 +241,71 @@ body {
 
 .queue-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: var(--space-xs) 0;
+  padding: var(--space-sm) var(--space-xs);
   border-bottom: 1px solid var(--color-border);
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
+  gap: var(--space-sm);
 }
 .queue-item:last-child {
   border-bottom: none;
+}
+.queue-item--highlighted {
+  background: rgba(66,133,244,0.08);
+  border: 1px solid rgba(66,133,244,0.2);
+  border-bottom: 1px solid rgba(66,133,244,0.2);
+  box-shadow: 0 0 12px rgba(66,133,244,0.1);
+}
+
+.queue-item__left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.queue-item__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .queue-item__name {
   font-size: var(--font-size-sm);
   font-weight: 500;
+}
+
+.queue-item__wait {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.queue-item__tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(66,133,244,0.15);
+  color: var(--color-primary);
+  display: inline-block;
+  width: fit-content;
+  animation: tag-in 0.3s ease;
+}
+@keyframes tag-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.queue-item__prediction {
+  font-size: 0.65rem;
+  color: var(--color-warning);
+  opacity: 0.9;
+  margin-top: 1px;
 }
 
 .queue-item__badge {
@@ -266,6 +318,25 @@ body {
 .queue-item__badge--low  { background: var(--color-queue-low); }
 .queue-item__badge--med  { background: var(--color-queue-med); color: #1a1a1a; }
 .queue-item__badge--high { background: var(--color-queue-high); }
+
+/* --- Phase Indicator --- */
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border);
+}
+.phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 2s infinite;
+}
 
 /* --- Chat Panel --- */
 .chat-panel {
