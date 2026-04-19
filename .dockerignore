@@ -6,5 +6,4 @@ tests/
 docs/
 README.md
 Dockerfile
-nginx.conf
 .dockerignore
